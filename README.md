@@ -2,10 +2,10 @@
 
 This code was created for my thesis research
 
-Topology
-Three phase VSI
-LCL Filter
-Grid connected
+Topology:<br />
+Three phase VSI<br />
+LCL Filter<br />
+Grid connected<br />
 
 
 Abstract
