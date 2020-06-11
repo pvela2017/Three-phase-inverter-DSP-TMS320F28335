@@ -127,32 +127,32 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXE_OUTPUTS += \
-inyeccion_reactivo.out \
+inversor_la.out \
 
 EXE_OUTPUTS__QUOTED += \
-"inyeccion_reactivo.out" \
+"inversor_la.out" \
 
 BIN_OUTPUTS += \
-inyeccion_reactivo.hex \
+inversor_la.hex \
 
 BIN_OUTPUTS__QUOTED += \
-"inyeccion_reactivo.hex" \
+"inversor_la.hex" \
 
 
 # All Target
-all: inyeccion_reactivo.out
+all: inversor_la.out
 
 # Tool invocations
-inyeccion_reactivo.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
+inversor_la.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: C2000 Linker'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/bin/cl2000" -v28 -ml -mt --float_support=fpu32 -Ooff -g --diag_warning=225 --display_error_number --diag_wrap=off -z -m"inyeccion_reactivo.map" --stack_size=0x300 --warn_sections -i"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include" --reread_libs --display_error_number --diag_wrap=off --xml_link_info="inyeccion_reactivo_linkInfo.xml" --rom_model -o "inyeccion_reactivo.out" $(ORDERED_OBJS)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/bin/cl2000" -v28 -ml -mt --float_support=fpu32 -g --diag_warning=225 --display_error_number --diag_wrap=off -z -m"inversor_la.map" --stack_size=0x300 --warn_sections -i"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include" --reread_libs --display_error_number --diag_wrap=off --xml_link_info="inversor_la_linkInfo.xml" --rom_model -o "inversor_la.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-inyeccion_reactivo.hex: $(EXE_OUTPUTS)
+inversor_la.hex: $(EXE_OUTPUTS)
 	@echo 'Invoking: C2000 Hex Utility'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/bin/hex2000"  -o "inyeccion_reactivo.hex" $(EXE_OUTPUTS__QUOTED)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/bin/hex2000"  -o "inversor_la.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building: $@'
 	@echo ' '
 

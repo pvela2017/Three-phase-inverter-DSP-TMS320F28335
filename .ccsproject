@@ -5,7 +5,7 @@
 	<deviceFamily value="C2000"/>
 	<codegenToolVersion value="6.4.6"/>
 	<isElfFormat value="false"/>
-	<connection value="common/targetdb/connections/TIXDS100v2_Connection.xml"/>
+	<connection value="common/targetdb/connections/TIXDS100usb_Connection.xml"/>
 	<linkerCommandFile value="28335_RAM_lnk.cmd"/>
 	<rts value="libc.a"/>
 	<createSlaveProjects value=""/>

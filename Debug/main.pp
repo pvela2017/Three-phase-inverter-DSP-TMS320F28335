@@ -1,6 +1,8 @@
 # FIXED
 
 main.obj: ../main.c
+main.obj: C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include/math.h
+main.obj: C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include/linkage.h
 main.obj: C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_Device.h
 main.obj: C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_Adc.h
 main.obj: C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_DevEmu.h
@@ -28,6 +30,8 @@ main.obj: C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_common/include/
 main.obj: C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_common/include/DSP2833x_DefaultIsr.h
 
 ../main.c: 
+C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include/math.h: 
+C:/ti/ccsv6/tools/compiler/ti-cgt-c2000_6.4.6/include/linkage.h: 
 C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_Device.h: 
 C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_Adc.h: 
 C:/ti/controlSUITE/device_support/f2833x/v140/DSP2833x_headers/include/DSP2833x_DevEmu.h: 

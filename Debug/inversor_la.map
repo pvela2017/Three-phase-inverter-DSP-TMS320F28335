@@ -1,9 +1,9 @@
 ******************************************************************************
              TMS320C2000 Linker PC v6.4.6                      
 ******************************************************************************
->> Linked Tue Mar 07 23:01:40 2017
+>> Linked Thu Mar 23 23:46:10 2017
 
-OUTPUT FILE NAME:   <control_sin_red.out>
+OUTPUT FILE NAME:   <inversor_la.out>
 ENTRY POINT SYMBOL: "_c_int00"  address: 000096cf
 
 

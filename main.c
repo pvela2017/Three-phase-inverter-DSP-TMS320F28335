@@ -1,22 +1,16 @@
 /*
- * Codigo para inversor VSI, conectado a la red usando PLL
- * y a paneles solares. Para inyectar potencia reactiva o activa
- * a la red. Hardware: TMS320F28335.
+ * Codigo para inversor VSI trifasico en lazo abierto.
  * Frecuencia de conmutacion: 3000 Hz
  * salida pwm pines: 00,02,04 y complementos 01,03,05
  *
- * 			Mefisto-LCDA 2017
+ *          Mefisto-LCDA 2017
  * 	     Universidad de Concepcion
  */
 
+#include <math.h>
+
 #include "DSP2833x_Device.h"
 #include "DSP2833x_Examples.h"
-
-#define M 10 //numero de muestras para la media movil
-
-//Variables para debugear
-volatile int des_expA=37,des_expB=40,des_expC=40; //Desfase experimental del PLL
-
 
 //Tabla de seno
 /*
@@ -31,6 +25,7 @@ volatile unsigned long int sine[60]={1250,1117, 986, 857, 733, 615, 505, 402, 30
  * 60 elementos porque 3e3kHz (periodo) cabe 60 veces en 50Hz (periodo); por lo tanto se tienen 60 oprtunidades
  * para cambiar el duty*/
 
+
 volatile unsigned long int sine[360]={1250,1228,1206,1184,1163,1141,1119,1097,1076,1054,1032,1011,989,968,947,926,905,884,863,842,821,801,781,760,740,720,701,681,662,642,623,605,586,568,549,531,513,496,479,462,445,428,412,396,380,364,349,334,319,305,290,277,263,250,237,224,212,200,188,177,
 		166,155,145,135,125,115,106,98,89,82,74,67,60,53,47,41,36,31,26,22,18,15,11,9,6,4,3,1,1,0,0,0,1,2,3,5,7,10,13,16,20,24,29,33,39,44,50,57,63,70,78,85,94,102,111,120,130,139,150,160,
 		171,182,194,206,218,230,243,256,270,284,298,312,326,341,357,372,388,404,420,436,453,470,487,505,522,540,558,577,595,614,633,652,671,691,710,730,750,770,791,811,832,852,873,894,915,936,957,979,1000,1022,1043,1065,1086,1108,1130,1152,1173,1195,1217,1239,
@@ -42,10 +37,6 @@ volatile unsigned long int sine[360]={1250,1228,1206,1184,1163,1141,1119,1097,10
  * 360 elementos porque 3e3kHz (periodo) cabe 60 veces en 50Hz (periodo); por lo tanto se tienen 60 oprtunidades
  * para cambiar el duty Y SE VARIARA CADA 6 PERO SE TIENE UNA MEJOR RESOLUCION DE 1° CUANDO SE NECESITE*/
 
-//Buffer de voltajes de red y corrientes del sistema
-volatile int va_buff[360],vb_buff[360],vc_buff[360]; //volatjes de la red
-volatile float Vmax=13.0; //voltaje peak definido mediante simulacion
-volatile float VA,VB,VC; //Voltajes medidos
 
 //Parametros moduladora
 volatile float ma=1; //valores entre 0 y 1 (indice de modulacion)
@@ -54,43 +45,27 @@ volatile float mc=1;
 volatile int phi_a=0; //desfase de la moduladora 1° de resolucion valores enteros
 volatile int phi_b=0;
 volatile int phi_c=0;
-volatile int angulo_alpha; //Angulo alpha a pasar a la tansformacion dq0
-
-//Parametros adquisicion
-volatile float va[M];
-volatile float vb[M];
-volatile float vc[M];
-volatile float vm_a;
-volatile float vm_b;
-volatile float vm_c;
-volatile float M_mul;
-volatile float G_va=1.8207,G_vb=1.874,G_vc=1.895;
-volatile float O_va=6.74,O_vb=6.8,O_vc=7.39;
 
 // Funciones de configuracion.
 void sys_conf(void);
 void DesactivarDog(void);
 void PWM_conf(void);
-void adc_conf(void);
-void IniCpuTimers(void);
+
 
 //Interrupciones
 __interrupt void epwm1_isr(void);
 __interrupt void epwm2_isr(void);
 __interrupt void epwm3_isr(void);
-__interrupt void cpu_timer1_isr(void);
 
 
 void main(void)
 {
 // Disable CPU interrupts
-
-	DINT;
+	   DINT;
 
 // Initialize System Control:
    //InitSysCtrl();
-   sys_conf(); //Configuracion el sistema (PLL a 150MHz y adc)
-   IniCpuTimers(); //Configuracion timer
+   sys_conf(); //Configuracion el sistema
    PWM_conf(); //Configuracion ePWM
 
 // Initialize the PIE control registers to their default state.
@@ -108,28 +83,22 @@ void main(void)
    PieVectTable.EPWM1_INT = &epwm1_isr;
    PieVectTable.EPWM2_INT = &epwm2_isr;
    PieVectTable.EPWM3_INT = &epwm3_isr;
-   PieVectTable.XINT13= &cpu_timer1_isr;
    EDIS;    // This is needed to disable write to EALLOW protected registers
 
-   ConfigCpuTimer(&CpuTimer1, 150, 55.55555); //Configura el timer1 cada  55 micro (muetreo datos)
-
-   CpuTimer1Regs.TCR.all = 0x4000; // Use write-only instruction to set TSS bit = 0
 
    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    //solo para debugear
    EALLOW;
    GpioCtrlRegs.GPBMUX1.bit.GPIO32 = 0;
    GpioCtrlRegs.GPBDIR.bit.GPIO32 = 1;
-   GpioCtrlRegs.GPBMUX1.bit.GPIO34 = 0;
-   GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;
    EDIS;
    GpioDataRegs.GPBCLEAR.bit.GPIO32 = 1;
-   GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;
    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
    //Activacion de interrupciones
    IER |= M_INT3; //Activa interrupcion CPU INT3 conectada al EPWM
-   IER |= M_INT13; //Timer1
+   IER |= M_INT1; //Timer
+   //IER |= M_INT13; //Timer
 
    //Activa interrupciones del PIE
    PieCtrlRegs.PIEIER3.bit.INTx1 = 1;
@@ -138,8 +107,6 @@ void main(void)
    PieCtrlRegs.PIEIER1.bit.INTx6 = 1;
    PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
-   //Inicializacion de algunas variables
-   M_mul=1.0/M;
 
    // Enable global Interrupts and higher priority real-time debug events:
    EINT;   // Enable Global interrupt INTM
@@ -157,6 +124,7 @@ void sys_conf(void)
 	DesactivarDog();
 	EALLOW;
 
+
 	// HISPCP/LOSPCP prescale register settings, normally it will be set to default values
 	   SysCtrlRegs.HISPCP.all = 0x0003;
 	   SysCtrlRegs.LOSPCP.all = 0x0002;
@@ -168,12 +136,7 @@ void sys_conf(void)
 	   XintfRegs.XINTCNF2.bit.CLKMODE = 1;
 	   // Enable XCLKOUT
 	   XintfRegs.XINTCNF2.bit.CLKOFF = 0;
-	   EDIS;
 
-	   adc_conf(); //Configuracion adc
-
-	   EALLOW;
-	   //Se desactivan los perifericos que no se utilizan
 	   SysCtrlRegs.PCLKCR0.bit.I2CAENCLK = 0;   // I2C
 	   SysCtrlRegs.PCLKCR0.bit.SCIAENCLK = 0;   // SCI-A
 	   SysCtrlRegs.PCLKCR0.bit.SCIBENCLK = 0;   // SCI-B
@@ -204,7 +167,7 @@ void sys_conf(void)
 
 	   SysCtrlRegs.PCLKCR3.bit.CPUTIMER0ENCLK = 1; // CPU Timer 0
 	   SysCtrlRegs.PCLKCR3.bit.CPUTIMER1ENCLK = 1; // CPU Timer 1
-	   SysCtrlRegs.PCLKCR3.bit.CPUTIMER2ENCLK = 1; // CPU Timer 2
+	   SysCtrlRegs.PCLKCR3.bit.CPUTIMER2ENCLK = 0; // CPU Timer 2
 
 	   SysCtrlRegs.PCLKCR3.bit.DMAENCLK = 1;       // DMA Clock
 	   SysCtrlRegs.PCLKCR3.bit.XINTFENCLK = 1;     // XTIMCLK
@@ -278,7 +241,7 @@ void PWM_conf(void)
 	EPwm1Regs.AQCTLA.bit.CAU=0b10;
 	EPwm1Regs.AQCTLA.bit.CAD=0b01;
 
-	//Para 6 pulsos
+	//En caso de necesitar 6 pulsos repetir para los otros timers
 	EPwm1Regs.AQCTLB.bit.CAU=0b01;
 	EPwm1Regs.AQCTLB.bit.CAD=0b10;
 
@@ -315,10 +278,6 @@ void PWM_conf(void)
 	EPwm2Regs.AQCTLA.bit.CAU=0b10;
 	EPwm2Regs.AQCTLA.bit.CAD=0b01;
 
-	//Para 6 pulsos
-	EPwm2Regs.AQCTLB.bit.CAU=0b01;
-	EPwm2Regs.AQCTLB.bit.CAD=0b10;
-
 	//Activar interrupcion
 	EPwm2Regs.ETSEL.bit.INTSEL=0b001; //TBCTR=0
 	EPwm2Regs.ETPS.bit.INTCNT=0b01; // 1 evento
@@ -336,7 +295,7 @@ void PWM_conf(void)
 	//Registro de control del tiempo
 	EPwm3Regs.TBCTL.bit.CTRMODE=0b10;   //Modo Up-count (pagina 23)
 	EPwm3Regs.TBCTL.bit.PHSEN=0b1;      // Esclavo
-	EPwm3Regs.TBCTL.bit.PHSDIR=0b1;
+	EPwm2Regs.TBCTL.bit.PHSDIR=0b1;
 	EPwm3Regs.TBCTL.bit.PRDLD=0b0;
 	EPwm3Regs.TBCTL.bit.SYNCOSEL=0b00;
 	EPwm3Regs.TBCTL.bit.HSPCLKDIV=pre_rap; //presescalador rapido 1
@@ -352,10 +311,6 @@ void PWM_conf(void)
 	EPwm3Regs.AQCTLA.bit.CAU=0b10;
 	EPwm3Regs.AQCTLA.bit.CAD=0b01;
 
-	//Para 6 pulsos
-	EPwm3Regs.AQCTLB.bit.CAU=0b01;
-	EPwm3Regs.AQCTLB.bit.CAD=0b10;
-
 	//Activar interrupcion
 	EPwm3Regs.ETSEL.bit.INTSEL=0b001; //TBCTR=0
 	EPwm3Regs.ETPS.bit.INTCNT=0b01; // 1 evento
@@ -368,38 +323,6 @@ void PWM_conf(void)
 	EDIS;
 }
 
-void adc_conf(void)
-{
-    EALLOW;
-	SysCtrlRegs.PCLKCR0.bit.ADCENCLK = 1;
-
-	ADC_cal(); //funcion de calibracion de la dsp automatico
-	AdcRegs.ADCTRL3.all = 0x00E0;  // Power up bandgap/reference/ADC circuits
-	AdcRegs.ADCTRL3.bit.ADCCLKPS=0b0000; //Core clock divider en 1
-	AdcRegs.ADCTRL3.bit.SMODE_SEL=0b1; //modo simultaneo
-	DELAY_US(5000L);
-
-	//Configuracion
-	AdcRegs.ADCTRL1.bit.SUSMOD=0b00; //no se suspende con breakpoints
-	AdcRegs.ADCTRL1.bit.CPS=0b0; //preescalador divide por 1
-	AdcRegs.ADCTRL1.bit.CONT_RUN=0b1; //modo continuo
-	AdcRegs.ADCTRL1.bit.SEQ_CASC=0b1; //modo cascada
-
-	AdcRegs.ADCTRL2.bit.EPWM_SOCA_SEQ1=0b0;
-	AdcRegs.ADCTRL2.bit.EPWM_SOCB_SEQ=0b0;
-
-	AdcRegs.ADCMAXCONV.all=0x0003; //8 muestras (4dobles)
-
-	AdcRegs.ADCCHSELSEQ1.bit.CONV00 = 0x0;    // Setup ADCINA0 y ADCINB0
-    AdcRegs.ADCCHSELSEQ1.bit.CONV01 = 0x1;    // Setup ADCINA1 y ADCINB1
-    AdcRegs.ADCCHSELSEQ1.bit.CONV02 = 0x2;    // Setup ADCINA2 y ADCINB2
-    AdcRegs.ADCCHSELSEQ1.bit.CONV03 = 0x3;    // Setup ADCINA3 y ADCINB3
-
-    AdcRegs.ADCTRL2.bit.SOC_SEQ1=1; //Inicia muestreo
-
-    EDIS;
-}
-
 void DesactivarDog(void)
 {
     EALLOW;
@@ -407,209 +330,60 @@ void DesactivarDog(void)
     EDIS;
 }
 
-void IniCpuTimers(void)
-{
-    // CPU Timer 0
-    // Initialize address pointers to respective timer registers:
-    CpuTimer0.RegsAddr = &CpuTimer0Regs;
-    // Initialize timer period to maximum:
-    CpuTimer0Regs.PRD.all  = 0xFFFFFFFF;
-    // Initialize pre-scale counter to divide by 1 (SYSCLKOUT):
-    CpuTimer0Regs.TPR.all  = 0;
-    CpuTimer0Regs.TPRH.all = 0;
-    // Make sure timer is stopped:
-    CpuTimer0Regs.TCR.bit.TSS = 1;
-    // Reload all counter register with period value:
-    CpuTimer0Regs.TCR.bit.TRB = 1;
-    // Reset interrupt counters:
-    CpuTimer0.InterruptCount = 0;
-
-    // CPU Timer 1
-	// Initialize address pointers to respective timer registers:
-	CpuTimer1.RegsAddr = &CpuTimer1Regs;
-	// Initialize timer period to maximum:
-	CpuTimer1Regs.PRD.all  = 0xFFFFFFFF;
-	// Initialize pre-scale counter to divide by 1 (SYSCLKOUT):
-	CpuTimer1Regs.TPR.all  = 0;
-	CpuTimer1Regs.TPRH.all = 0;
-	// Make sure timer is stopped:
-	CpuTimer1Regs.TCR.bit.TSS = 1;
-	// Reload all counter register with period value:
-	CpuTimer1Regs.TCR.bit.TRB = 1;
-	// Reset interrupt counters:
-	CpuTimer1.InterruptCount = 0;
-
-
-// CpuTimer2 is reserved for DSP BIOS & other RTOS
-// Do not use this timer if you ever plan on integrating
-// DSP-BIOS or another realtime OS.
-    // Initialize address pointers to respective timer registers:
-        CpuTimer2.RegsAddr = &CpuTimer2Regs;
-        // Initialize timer period to maximum:
-        CpuTimer2Regs.PRD.all  = 0xFFFFFFFF;
-        // Make sure timers are stopped:
-        CpuTimer2Regs.TCR.bit.TSS = 1;
-        // Reload all counter register with period value:
-        CpuTimer2Regs.TCR.bit.TRB = 1;
-        // Reset interrupt counters:
-        CpuTimer2.InterruptCount = 0;
-}
-
 //Interrupciones
 __interrupt void epwm1_isr(void) //actualiza la tabla
 {
+	static int i=0;
 	int angulo;
-	int comp;
-	angulo=angulo_alpha+phi_a+des_expA; //En caso de hacerlo en lazo abierto y sin red usar angulo=i+phi_a; repetir en las otras fases
+	angulo=i+phi_a;
 	if (angulo>359)//en caso de sobrepasar la cantidad maxima de elementos del arreglo
 	{
 		angulo-=360;
 	}
-	comp=ma*va_buff[angulo];
-	if(comp>2499)
+	EPwm1Regs.CMPA.half.CMPA=ma*sine[angulo];
+	i+=6;
+	if(i>359)
 	{
-		comp=2499;
+		i=0;
 	}
-	if(comp<1)
-	{
-		comp=1;
-	}
-	EPwm1Regs.CMPA.half.CMPA=ma*va_buff[angulo]; //En caso de hacerlo en lazo abierto y sin red usar ma*sine[angulo]; repetir en las otras fases
-
 	EPwm1Regs.ETCLR.bit.INT = 1; //Limpia el flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
 }
 
 __interrupt void epwm2_isr(void)//actualiza la tabla
 {
+	static int i=120; //desfae de 120 i=20 (tabla de 60)
 	int angulo;
-	int comp;
-	angulo=angulo_alpha+phi_b+des_expB;
+	angulo=i+phi_b;
 	if (angulo>359)//en caso de sobrepasar la cantidad maxima de elementos del arreglo
 	{
 		angulo-=360;
 	}
-	comp=mb*vb_buff[angulo];
-	if(comp>2499)
+	EPwm2Regs.CMPA.half.CMPA=mb*sine[angulo];
+	i+=6;
+	if(i>359)
 	{
-		comp=2499;
+		i=0;
 	}
-	if(comp<1)
-	{
-		comp=1;
-	}
-	EPwm2Regs.CMPA.half.CMPA=comp;
-
 	EPwm2Regs.ETCLR.bit.INT = 1; //Limpia el flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
 }
 
 __interrupt void epwm3_isr(void)//actualiza la tabla
 {
+	static int i=240; //desfae de 240 i=40 (tabla de 60)
 	int angulo;
-	int comp;
-	angulo=angulo_alpha+phi_c+des_expC;
+	angulo=i+phi_c;
 	if (angulo>359)//en caso de sobrepasar la cantidad maxima de elementos del arreglo
 	{
 		angulo-=360;
 	}
-	comp=mc*vc_buff[angulo];
-
-	if(comp>2499)
+	EPwm3Regs.CMPA.half.CMPA=mc*sine[angulo];
+	i+=6;
+	if(i>359)
 	{
-		comp=2499;
+		i=0;
 	}
-	if(comp<1)
-	{
-		comp=1;
-	}
-	EPwm3Regs.CMPA.half.CMPA=comp;
-
 	EPwm3Regs.ETCLR.bit.INT = 1; //Limpia el flag
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP3;
-}
-
-__interrupt void cpu_timer1_isr(void)
-{
-   CpuTimer1.InterruptCount++;
-   GpioDataRegs.GPBSET.bit.GPIO32 = 1;
-
-   float va_b,vb_b,vc_b;
-   static int j=0;
-   int i=0;
-
-   	vm_a=0;
-   	vm_b=0;
-   	vm_c=0.0;
-
-   	//Se olvida el ultimo dato
-   	for(i=0;i<M-1;i++)
-   	{
-   		va[i]=va[i+1];
-   		vb[i]=vb[i+1];
-   		vc[i]=vc[i+1];
-   	}
-   	//Se carga el nuevo dato
-   	//Lado A
-   	vc[M-1]=AdcRegs.ADCRESULT0>>4;	//A0
-   	vb[M-1]=AdcRegs.ADCRESULT2>>4;	//A1
-   	va[M-1]=AdcRegs.ADCRESULT4>>4;	//A2
-
-   	//Se obtiene la media movil
-   	for(i=0;i<M;i++)
-   	{
-   		vm_a+=va[i];
-   		vm_b+=vb[i];
-   		vm_c+=vc[i];
-   	}
-
-   	vm_a*=M_mul;
-   	vm_b*=M_mul;
-   	vm_c*=M_mul;
-
-   	vm_a=0.00732421875*vm_a-15.0; //v_salida=Limite_superior/(bit_max-bit_zero)+Limite_inferior
-   	vm_b=0.00732421875*vm_b-15.0; //=> v_salida=15/(4096-2048)-15
-   	vm_c=0.00732421875*vm_c-15.0; //12 bits =4096 (bit_max)
-
-   	//Calibracion de la señal
-   	vm_a=G_va*(vm_a+O_va);
-   	vm_b=G_vb*(vm_b+O_vb);
-   	vm_c=G_vc*(vm_c+O_vc);
-
-   	//Se guardan las variables para graficarlas
-   	VA=vm_a;
-   	VB=vm_b;
-   	VC=vm_c;
-
-   	//Se asegura que no excedan los maximos
-   	/*
-   	vm_a<0?vm_a=0:vm_a;
-   	vm_a>Vmax?vm_a=Vmax:vm_a;
-   	vm_b<0?vm_b=0:vm_b;
-   	vm_b>Vmax?vm_b=Vmax:vm_b;
-   	vm_c>Vmax?vm_c=Vmax:vm_c;
-   	vm_c<0?vm_c=0:vm_c;*/
-
-   	//Se guarda 1 periodo en el buffer
-   	//Se normalizan los valores
-   	va_b=vm_a/Vmax;
-   	vb_b=vm_b/Vmax;
-   	vc_b=vm_c/Vmax;
-
-   	//Se dejan los valores entre 0 y 2500 para poder usarlos en el comparador
-   	//del pwm, en lugar de la tabla sine
-  	va_buff[j]=-1250*(va_b-1);  //Se generan las tablas de seno para cada fase
-  	vb_buff[j]=-1250*(vb_b-1);
-  	vc_buff[j]=-1250*(vc_b-1);
-
-   	angulo_alpha=j;
-   	j++;
-
-   	if(j>359)
-   	{
-   		j=0;
-   	}
-   	GpioDataRegs.GPBCLEAR.bit.GPIO32 = 1;
-   // The CPU acknowledges the interrupt.
-   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
