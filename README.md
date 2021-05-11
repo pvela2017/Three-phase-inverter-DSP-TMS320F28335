@@ -21,4 +21,4 @@ The models are verified by Psim simulations in open and closed loop, with emphas
 The results show that it is possible to provide this energy, while the time during which it can be supplied depends on the size of the capacitor and the amount of energy needed.
 
 You can find further information here:
-https://sites.google.com/view/pablovela/solar-energy/thesis
+https://sites.google.com/view/pablovela/solar-energy/thesis-research
