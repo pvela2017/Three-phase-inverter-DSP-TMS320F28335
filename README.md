@@ -22,3 +22,9 @@ The results show that it is possible to provide this energy, while the time duri
 
 You can find further information here:
 https://sites.google.com/view/pablovela/solar-energy/thesis-research
+
+## Donations
+I do not charge anything for the information and I keep it ads-free. So if you think that any information you obtained here is worth some money and you are willing to pay for it, feel free to send a donation through paypal.
+Thanks in advance!
+
+[![](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=YSCP9AAUCWBS2)
